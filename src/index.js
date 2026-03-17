@@ -11,7 +11,7 @@ const app = express();
 
 const allowedOrigins = [
   'http://localhost:5173',           // For your local testing
-  'https://karpi-ai-frontend.vercel.app/' // Replace with your ACTUAL Vercel URL
+  'https://karpi-ai-frontend.vercel.app' // Replace with your ACTUAL Vercel URL
 ];
 
 // Middleware
