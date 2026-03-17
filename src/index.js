@@ -9,24 +9,33 @@ dotenv.config();
 
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://karpi-ai-frontend.vercel.app' // Ensure this is exactly what you see in the browser address bar
-];
+const originsEnv = process.env.ALLOWED_ORIGINS || 'http://localhost:5173';
+const allowedOrigins = originsEnv.split(',');
 
+// 1. Configure CORS middleware
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`🚫 Blocked by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.options('*', cors());
+
 app.use(express.json());
 
 // Routes
-app.use("/api", authRoutes); // Handles /api/register
-app.use("/api", aiRoutes);   // Handles /api/learn, /api/exam, etc.
-app.use("/api/admin", adminRoutes); // Handles /api/admin/stats
+app.use("/api", authRoutes);
+app.use("/api", aiRoutes);
+app.use("/api/admin", adminRoutes);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
