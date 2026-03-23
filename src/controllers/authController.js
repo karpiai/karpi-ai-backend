@@ -1,55 +1,72 @@
 import { supabase } from "../config/supabase.js";
 
-export const registerStudent = async (req, res) => {
-  // 1. Trim the input immediately to remove accidental spaces
-  const name = req.body.name?.trim();
-  const rollNo = req.body.rollNo?.trim();
-  const accessCode = req.body.accessCode?.trim();
-
-  console.log(`🔐 Registration Attempt for: [${name}] | Code: [${accessCode}]`);
-
-  const { data: allRows } = await supabase.from('institutions').select('access_code');
-  console.log("🔍 All Codes in DB:", allRows.map(r => `[${r.access_code}]`));
+export const handleRegistration = async (req, res) => {
+  const { name, rollNo, accessCode } = req.body;
 
   try {
-    // 2. Search using ilike AND trim the database field on the fly
-    // Note: We use a raw filter here to ensure the DB side is also trimmed
-    const { data: institutions, error: instErr } = await supabase
-      .from('institutions')
-      .select('id, name, access_code')
-      .ilike('access_code', accessCode);
+    const cleanAccessCode = accessCode.trim().toUpperCase();
 
-    console.log("Database Response:", { institutions, instErr });
+    // 1. Fetch Student AND Institution data in a single relational query
+    const { data: student, error } = await supabase
+      .from('students')
+      .select(`
+        id, 
+        name, 
+        department, 
+        semester, 
+        is_active,
+        institutions (
+          name,
+          access_code,
+          is_active
+        )
+      `)
+      .eq('roll_no', rollNo.trim())
+      .single();
 
-    if (instErr || !institutions || institutions.length === 0) {
-      return res.status(401).json({
-        message: `Invalid Code: ${accessCode}. Please check your institution code.`
+    // 2. Student Identity & Status Checks
+    if (error || !student) {
+      return res.status(404).json({ 
+        message: "Roll Number not found in the institution's roster. Please check your ID." 
       });
     }
 
-    const inst = institutions[0];
+    if (!student.is_active) {
+      return res.status(403).json({ 
+        message: "Your student account is inactive. Please contact your administrator." 
+      });
+    }
 
-    // 3. Upsert Student
-    const { data: student, error: stdErr } = await supabase
-      .from('students')
-      .upsert({
-        full_name: name,
-        roll_no: rollNo,
-        institution_id: inst.id
-      }, { onConflict: 'institution_id, roll_no' })
-      .select()
-      .single();
+    // 3. Institution Level Checks (The SaaS Guardrails)
+    if (!student.institutions) {
+      return res.status(500).json({ 
+        message: "Database configuration error: Student not linked to an institution." 
+      });
+    }
 
-    if (stdErr) throw stdErr;
+    if (!student.institutions.is_active) {
+      return res.status(403).json({ 
+        message: "Access Denied: The institutional license for this college is currently suspended." 
+      });
+    }
 
+    if (student.institutions.access_code !== cleanAccessCode) {
+      return res.status(401).json({ 
+        message: "Invalid College Access Code for this Roll Number." 
+      });
+    }
+
+    // 4. Return the fully dynamic Profile Payload
     res.status(200).json({
-      collegeName: inst.name,
-      studentName: student.full_name,
-      token: "mock-jwt-token"
+      studentId: student.id,
+      studentName: student.name, 
+      collegeName: student.institutions.name, 
+      department: student.department,
+      semester: student.semester
     });
 
   } catch (error) {
-    console.error("Supabase Auth Error:", error);
-    res.status(500).json({ message: "Database connection failed." });
+    console.error("Auth Controller Error:", error);
+    res.status(500).json({ message: "Internal server error during authentication." });
   }
 };

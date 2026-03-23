@@ -1,29 +1,20 @@
 import express from "express";
 import { handleAIRequest } from "../controllers/aiController.js";
 import { usageLogger } from "../middleware/usageLogger.js";
+import { tokenGuard } from "../middleware/tokenGuard.js"; // Import the guard
 
 const router = express.Router();
-/**
- * We apply the usageLogger to all AI routes.
- * This way, Nagai and JP College traffic is tracked automatically.
- */
+
+// Track usage for everyone
 router.use(usageLogger);
+
 /**
- * All AI routes are mapped to the same controller function.
- * The controller will use the URL path (learn, exam, etc.) 
- * to decide which service to call.
+ * We apply tokenGuard to every AI POST request.
+ * This ensures no Groq credits are spent if the student is over their limit.
  */
-
-// Handles Syllabus Notes & Explanations
-router.post("/learn", handleAIRequest);
-
-// Handles Question Paper & Exam Prep Generation
-router.post("/exam", handleAIRequest);
-
-// Handles Classroom Activity & Lesson Planning
-router.post("/activity", handleAIRequest);
-
-// Handles English Grammar & Spoken English Coaching
-router.post("/grammar", handleAIRequest);
+router.post("/learn", tokenGuard, handleAIRequest);
+router.post("/exam", tokenGuard, handleAIRequest);
+router.post("/activity", tokenGuard, handleAIRequest);
+router.post("/grammar", tokenGuard, handleAIRequest);
 
 export default router;

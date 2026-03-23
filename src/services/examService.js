@@ -50,8 +50,29 @@ export const getExamResponse = async (topic, subjectId) => {
         const contextDocs = await retriever.invoke(topic);
         const contextText = contextDocs.map((doc) => doc.pageContent).join("\n");
 
-        const chain = RunnableSequence.from([prompt, llm, new StringOutputParser()]);
-        return await chain.invoke({ topic, context: contextText });
+        // 1. Remove StringOutputParser to keep the rich metadata object
+        const chain = RunnableSequence.from([prompt, llm]);
+
+        // 2. This now returns an AIMessage object, not just a string
+        const response = await chain.invoke({ topic, context: contextText });
+
+        // 3. Extract the text content
+        const answer = response.content;
+
+        // 4. Extract the token usage safely
+        // Langchain standardizes this in recent versions, but we check both common locations just in case
+        let tokensUsed = 0;
+        if (response.usage_metadata) {
+            tokensUsed = response.usage_metadata.total_tokens; // Modern Langchain format
+        } else if (response.response_metadata?.tokenUsage) {
+            tokensUsed = response.response_metadata.tokenUsage.totalTokens; // Older format
+        }
+
+        // 5. Return the exact object format your controller expects!
+        return {
+            answer,
+            tokensUsed
+        };
     } catch (error) {
         console.error("Error in getExamResponse:", error);
         throw error;

@@ -1,5 +1,5 @@
 import express from "express";
-import { registerStudent } from "../controllers/authController.js";
+import { handleRegistration } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -8,6 +8,6 @@ const router = express.Router();
  * @desc    Registers a student and validates institutional access
  * @access  Public
  */
-router.post("/register", registerStudent);
+router.post("/register", handleRegistration);
 
 export default router;
