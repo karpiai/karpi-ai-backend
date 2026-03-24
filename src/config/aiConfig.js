@@ -13,8 +13,8 @@ import { VoyageEmbeddings } from "@langchain/community/embeddings/voyage";
 
 // 2. Replace the embeddings export
 export const embeddings = new VoyageEmbeddings({
-    apiKey: "pa-uBN-3lfFnDkq7mEicgzonPET-xUkpb59R7eMG1X0dz4", // Replace with your actual API key
-    modelName: "voyage-3", // Industry-leading model for document retrieval
+    apiKey: process.env.VOYAGEAI_API_KEY, 
+    modelName: "voyage-3", 
 });
 
 export const llm = new ChatGroq({
