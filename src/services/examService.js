@@ -41,7 +41,6 @@ const prompt = PromptTemplate.fromTemplate(`
 
 export const getExamResponse = async (topic, subjectId) => {
     try {
-        const { topic, subjectId } = req.body;
         const collectionName = subjectId || "tnteu-sem1-psychology";
         console.log(`📝 Exam Query: "${topic}" in "${collectionName}"`);
 
