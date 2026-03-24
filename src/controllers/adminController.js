@@ -40,7 +40,7 @@ export const getInstitutionMetrics = async (req, res) => {
             const tokens = student.total_tokens_used || 0;
             return {
                 name: student.name,
-                rollNumber: student.roll_number,
+                rollNumber: student.roll_no,
                 department: student.department,
                 semester: student.semester,
                 wordsUsed: Math.floor(tokens / 1.3) // Translates abstract API metrics to educational value
