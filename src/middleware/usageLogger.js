@@ -2,39 +2,52 @@ import { supabase } from '../config/supabase.js';
 
 export const usageLogger = async (req, res, next) => {
   try {
-    // 1. SAFETY CHECK: Only process POST requests with a body
-    // If it's a GET request (like /stats) or has no body, skip logging
     if (req.method !== 'POST' || !req.body || Object.keys(req.body).length === 0) {
       return next(); 
     }
 
-    const { collegeName, studentName, topic } = req.body;
+    // Notice we capture subjectId (which is currently the string "tnteu-sem1-psychology")
+    const { institutionId, studentId, topic, subjectId } = req.body;
     
-    // 2. SKIP IF NO COLLEGE: Don't log if collegeName is missing 
-    // (This helps avoid errors if req.body exists but is for something else)
-    if (!collegeName) {
+    if (!institutionId || !studentId) {
       return next();
     }
 
     const mode = req.path.split('/').pop();
+    let dbSubjectId = null;
 
-    // ... rest of your existing supabase logging logic ...
-    const { data: inst } = await supabase
-      .from('institutions')
-      .select('id')
-      .eq('name', collegeName)
-      .single();
-
-    if (inst) {
-      await supabase.from('usage_logs').insert({
-        institution_id: inst.id,
-        mode: mode,
-        topic: topic || 'General Query'
-      });
-      console.log(`📊 Logged: ${collegeName} | ${studentName} | ${mode.toUpperCase()}`);
+    // Resolve the Vector DB string to our internal Subject UUID
+    if (subjectId) {
+        const { data: subjectInfo } = await supabase
+            .from('subjects')
+            .select('id')
+            .eq('collection_name', subjectId)
+            .single();
+            
+        if (subjectInfo) {
+            dbSubjectId = subjectInfo.id;
+        }
+    } else {
+        // If no subjectId provided, we can optionally link to a default "General" subject or leave it null
+        // For now, we'll just leave it null to indicate it's a general query not tied to a specific subject.
+        dbSubjectId = null;
     }
+
+    // Insert the log with the linked subject
+    const { error } = await supabase.from('usage_logs').insert({
+      institution_id: institutionId,
+      student_id: studentId,
+      subject_id: dbSubjectId, // The new relational link!
+      mode: mode,
+      topic: topic || 'General Query'
+    });
+
+    console.log(`Logged usage for Student ID: ${studentId} | Mode: ${mode} | Subject ID: ${dbSubjectId}`);
+
+    if (error) throw error;
+    
   } catch (err) {
-    console.error("🚨 Usage Logger System Error:", err.message);
+    console.error("🚨 Usage Logger Error:", err.message);
   }
 
   next();

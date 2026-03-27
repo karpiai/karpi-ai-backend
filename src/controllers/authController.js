@@ -1,7 +1,7 @@
 import { supabase } from "../config/supabase.js";
 
 export const handleRegistration = async (req, res) => {
-  const { name, rollNo, accessCode } = req.body;
+  const { rollNo, accessCode } = req.body;
 
   try {
     const cleanAccessCode = accessCode.trim().toUpperCase();
@@ -10,7 +10,8 @@ export const handleRegistration = async (req, res) => {
     const { data: student, error } = await supabase
       .from('students')
       .select(`
-        id, 
+        id,
+        institution_id, 
         name, 
         department, 
         semester, 
@@ -59,6 +60,7 @@ export const handleRegistration = async (req, res) => {
     // 4. Return the fully dynamic Profile Payload
     res.status(200).json({
       studentId: student.id,
+      institutionId: student.institution_id,
       studentName: student.name, 
       collegeName: student.institutions.name, 
       department: student.department,

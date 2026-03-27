@@ -60,3 +60,56 @@ export const getInstitutionMetrics = async (req, res) => {
         res.status(500).json({ error: "Internal server error fetching metrics." });
     }
 };
+
+export const getInstitutionLogs = async (req, res) => {
+    try {
+        const { accessCode } = req.body;
+
+        if (!accessCode) {
+            return res.status(400).json({ error: "Access code is required." });
+        }
+
+        // 1. Validate Access Code and get Institution ID
+        const { data: institution, error: instError } = await supabase
+            .from('institutions')
+            .select('id, name')
+            .eq('access_code', accessCode)
+            .maybeSingle(); 
+
+        if (instError || !institution) {
+            return res.status(401).json({ error: "Invalid Access Code." });
+        }
+
+        // Relational Query: Now we join BOTH students and subjects
+        const { data: logs, error: logError } = await supabase
+            .from('usage_logs')
+            .select(`
+                id, mode, topic, created_at,
+                students (name, roll_no, department, semester),
+                subjects (subject_name)
+            `)
+            .eq('institution_id', institution.id)
+            .order('created_at', { ascending: false })
+            .limit(500); 
+
+        if (logError) throw logError;
+
+        const formattedLogs = logs.map(log => ({
+            id: log.id,
+            mode: log.mode,
+            topic: log.topic,
+            createdAt: new Date(log.created_at).toLocaleString('en-IN'), 
+            studentName: log.students?.name || 'Deleted User',
+            rollNumber: log.students?.roll_no || 'N/A',
+            department: log.students?.department || 'N/A',
+            semester: log.students?.semester || 'N/A',
+            subjectName: log.subjects?.subject_name || 'General / Not Selected' // Extracts the subject name
+        }));
+
+        res.status(200).json({ success: true, logs: formattedLogs });
+
+    } catch (error) {
+        console.error("Error fetching logs:", error);
+        res.status(500).json({ error: "Internal server error fetching logs." });
+    }
+};
