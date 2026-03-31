@@ -6,7 +6,7 @@ import { supabase } from "../config/supabase.js"; // Make sure to import your DB
 
 export const handleAIRequest = async (req, res) => {
   // 1. Extract studentId for the billing meter
-  const { topic, subjectId, studentId } = req.body;
+  const { topic, subjectId, studentId, medium } = req.body;
   const mode = req.path.split('/').pop(); 
 
   if (!studentId) {
@@ -20,16 +20,16 @@ export const handleAIRequest = async (req, res) => {
     // IMPORTANT: Your services must now return an object { answer, tokensUsed }
     switch (mode) {
       case 'learn':
-        aiResult = await getLearnResponse(topic, subjectId);
+        aiResult = await getLearnResponse(topic, subjectId, medium); // Pass medium for language-specific responses
         break;
       case 'exam':
-        aiResult = await getExamResponse(topic, subjectId);
+        aiResult = await getExamResponse(topic, subjectId, medium); // Pass medium for language-specific responses
         break;
       case 'grammar':
         aiResult = await getGrammarResponse(topic);
         break;
       case 'activity':
-        aiResult = await getActivityResponse(topic, subjectId);
+        aiResult = await getActivityResponse(topic, subjectId, medium); // Pass medium for language-specific responses
         break;
       default:
         return res.status(400).json({ error: "Invalid Mode" });

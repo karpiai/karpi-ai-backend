@@ -6,7 +6,7 @@ export const usageLogger = async (req, res, next) => {
       return next(); 
     }
 
-    // Notice we capture subjectId (which is currently the string "tnteu-sem1-psychology")
+    // subjectId is NOW exactly the UUID sent from the React frontend!
     const { institutionId, studentId, topic, subjectId } = req.body;
     
     if (!institutionId || !studentId) {
@@ -14,37 +14,22 @@ export const usageLogger = async (req, res, next) => {
     }
 
     const mode = req.path.split('/').pop();
-    let dbSubjectId = null;
+    
+    // We no longer need a Supabase lookup! We just ensure it's a valid string, otherwise null.
+    const dbSubjectId = (subjectId && subjectId.trim() !== "") ? subjectId : null;
 
-    // Resolve the Vector DB string to our internal Subject UUID
-    if (subjectId) {
-        const { data: subjectInfo } = await supabase
-            .from('subjects')
-            .select('id')
-            .eq('collection_name', subjectId)
-            .single();
-            
-        if (subjectInfo) {
-            dbSubjectId = subjectInfo.id;
-        }
-    } else {
-        // If no subjectId provided, we can optionally link to a default "General" subject or leave it null
-        // For now, we'll just leave it null to indicate it's a general query not tied to a specific subject.
-        dbSubjectId = null;
-    }
-
-    // Insert the log with the linked subject
+    // Insert the log with the direct UUID link
     const { error } = await supabase.from('usage_logs').insert({
       institution_id: institutionId,
       student_id: studentId,
-      subject_id: dbSubjectId, // The new relational link!
+      subject_id: dbSubjectId, 
       mode: mode,
       topic: topic || 'General Query'
     });
 
-    console.log(`Logged usage for Student ID: ${studentId} | Mode: ${mode} | Subject ID: ${dbSubjectId}`);
-
     if (error) throw error;
+
+    console.log(`Logged usage for Student ID: ${studentId} | Mode: ${mode} | Subject UUID: ${dbSubjectId}`);
     
   } catch (err) {
     console.error("🚨 Usage Logger Error:", err.message);

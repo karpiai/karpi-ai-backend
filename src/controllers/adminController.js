@@ -1,53 +1,47 @@
-import { supabase } from "../config/supabase.js"; // Make sure to import your DB client
+import { supabase } from "../config/supabase.js";
 
 export const getInstitutionMetrics = async (req, res) => {
     try {
         const { accessCode } = req.body;
 
-        // 1. Initial Validation
         if (!accessCode) {
             return res.status(400).json({ error: "Access code is required." });
         }
 
-        // 2. Validate against the 'institutions' table
-        // We use maybeSingle() so Supabase doesn't throw a fatal error if someone types a wrong code
         const { data: institution, error: instError } = await supabase
             .from('institutions')
-            .select('id, name') // NOTE: If your primary key is 'institution_id' instead of 'id', change it here
+            .select('id, name') 
             .eq('access_code', accessCode)
             .maybeSingle(); 
 
-        if (instError) throw instError;
-
-        // If no matching access code is found in the database
-        if (!institution) {
+        if (instError || !institution) {
             return res.status(401).json({ error: "Invalid Institution Access Code." });
         }
 
         console.log(`📊 Admin Login Success: Fetching metrics for ${institution.name}`);
 
-        // 3. Fetch Students from the 'students' table
+        // --- UPDATED: Using department_name, program_name, and medium ---
         const { data: students, error: studentError } = await supabase
             .from('students')
-            .select('name, roll_no, department, semester, total_tokens_used')
+            .select('name, roll_no, department_name, program_name, semester, medium, total_tokens_used')
             .eq('institution_id', institution.id)
-            .order('total_tokens_used', { ascending: false }); // Most active students at the top
+            .order('total_tokens_used', { ascending: false }); 
 
         if (studentError) throw studentError;
 
-        // 4. The "Tokens to Words" Math Translation
         const metrics = students.map(student => {
             const tokens = student.total_tokens_used || 0;
             return {
                 name: student.name,
                 rollNumber: student.roll_no,
-                department: student.department,
+                program: student.program_name,         // New
+                department: student.department_name,   // Updated
                 semester: student.semester,
-                wordsUsed: Math.floor(tokens / 1.3) // Translates abstract API metrics to educational value
+                medium: student.medium,                // New
+                wordsUsed: Math.floor(tokens / 1.3) 
             };
         });
 
-        // 5. Send back the clean data payload
         res.status(200).json({
             success: true,
             institutionName: institution.name, 
@@ -69,7 +63,6 @@ export const getInstitutionLogs = async (req, res) => {
             return res.status(400).json({ error: "Access code is required." });
         }
 
-        // 1. Validate Access Code and get Institution ID
         const { data: institution, error: instError } = await supabase
             .from('institutions')
             .select('id, name')
@@ -80,13 +73,13 @@ export const getInstitutionLogs = async (req, res) => {
             return res.status(401).json({ error: "Invalid Access Code." });
         }
 
-        // Relational Query: Now we join BOTH students and subjects
+        // --- UPDATED: Fetching the renamed columns + the Subject's medium ---
         const { data: logs, error: logError } = await supabase
             .from('usage_logs')
             .select(`
                 id, mode, topic, created_at,
-                students (name, roll_no, department, semester),
-                subjects (subject_name)
+                students (name, roll_no, department_name, program_name, semester),
+                subjects (subject_name, medium)
             `)
             .eq('institution_id', institution.id)
             .order('created_at', { ascending: false })
@@ -101,9 +94,11 @@ export const getInstitutionLogs = async (req, res) => {
             createdAt: new Date(log.created_at).toLocaleString('en-IN'), 
             studentName: log.students?.name || 'Deleted User',
             rollNumber: log.students?.roll_no || 'N/A',
-            department: log.students?.department || 'N/A',
+            program: log.students?.program_name || 'N/A',            // New
+            department: log.students?.department_name || 'N/A',      // Updated
             semester: log.students?.semester || 'N/A',
-            subjectName: log.subjects?.subject_name || 'General / Not Selected' // Extracts the subject name
+            // We can now show the Admin exactly which language the student used!
+            subjectName: log.subjects ? `${log.subjects.subject_name} (${log.subjects.medium})` : 'General / Not Selected' 
         }));
 
         res.status(200).json({ success: true, logs: formattedLogs });

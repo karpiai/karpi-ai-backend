@@ -6,24 +6,31 @@ export const handleRegistration = async (req, res) => {
   try {
     const cleanAccessCode = accessCode.trim().toUpperCase();
 
-    // 1. Fetch Student AND Institution data in a single relational query
+    // 1. Fetch Student, Institution, AND Department routing data in one massive relational query
     const { data: student, error } = await supabase
-      .from('students')
-      .select(`
-        id,
-        institution_id, 
+    .from('students')
+    .select(`
+        id, 
         name, 
-        department, 
-        semester, 
+        roll_no, 
+        institution_id, 
+        department_name,
+        program_name,
+        semester,
+        department_id,
+        medium,
         is_active,
         institutions (
           name,
-          access_code,
-          is_active
+          is_active,
+          access_code
+        ),
+        departments (
+          program_type_id
         )
-      `)
-      .eq('roll_no', rollNo.trim())
-      .single();
+    `)
+    .eq('roll_no', rollNo)
+    .single();
 
     // 2. Student Identity & Status Checks
     if (error || !student) {
@@ -57,14 +64,20 @@ export const handleRegistration = async (req, res) => {
       });
     }
 
-    // 4. Return the fully dynamic Profile Payload
+    // 4. Return the fully dynamic Profile Payload mapping perfectly to React
     res.status(200).json({
       studentId: student.id,
       institutionId: student.institution_id,
       studentName: student.name, 
       collegeName: student.institutions.name, 
-      department: student.department,
-      semester: student.semester
+      department: student.department_name, // Sent as 'department' to match frontend UI
+      program: student.program_name,       
+      semester: student.semester,
+      
+      // Extracting the relational UUIDs for the frontend metadata engine
+      programId: student.departments?.program_type_id,
+      departmentId: student.department_id,
+      medium: student.medium
     });
 
   } catch (error) {
