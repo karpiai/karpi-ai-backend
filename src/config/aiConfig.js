@@ -19,7 +19,8 @@ export const embeddings = new VoyageEmbeddings({
 
 export const llm = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.3-70b-versatile", // <-- Back to the smart model!
+    temperature: 0.1, 
 });
 
 export const getVectorStore = (subjectId) => {

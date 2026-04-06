@@ -1,18 +1,19 @@
 import { supabase } from "../config/supabase.js";
 
 export const handleRegistration = async (req, res) => {
-  const { rollNo, accessCode } = req.body;
+  // 1. ADDED: Destructure password from the frontend request
+  const { rollNo, accessCode, password } = req.body;
 
   try {
     const cleanAccessCode = accessCode.trim().toUpperCase();
 
-    // 1. Fetch Student, Institution, AND Department routing data in one massive relational query
     const { data: student, error } = await supabase
     .from('students')
     .select(`
         id, 
         name, 
         roll_no, 
+        password,
         institution_id, 
         department_name,
         program_name,
@@ -32,7 +33,6 @@ export const handleRegistration = async (req, res) => {
     .eq('roll_no', rollNo)
     .single();
 
-    // 2. Student Identity & Status Checks
     if (error || !student) {
       return res.status(404).json({ 
         message: "Roll Number not found in the institution's roster. Please check your ID." 
@@ -45,7 +45,13 @@ export const handleRegistration = async (req, res) => {
       });
     }
 
-    // 3. Institution Level Checks (The SaaS Guardrails)
+    // 2. NEW CHECK: Password Validation
+    if (student.password !== password) {
+      return res.status(401).json({ 
+        message: "Invalid Password. Please try again." 
+      });
+    }
+
     if (!student.institutions) {
       return res.status(500).json({ 
         message: "Database configuration error: Student not linked to an institution." 
@@ -64,17 +70,14 @@ export const handleRegistration = async (req, res) => {
       });
     }
 
-    // 4. Return the fully dynamic Profile Payload mapping perfectly to React
     res.status(200).json({
       studentId: student.id,
       institutionId: student.institution_id,
       studentName: student.name, 
       collegeName: student.institutions.name, 
-      department: student.department_name, // Sent as 'department' to match frontend UI
+      department: student.department_name, 
       program: student.program_name,       
       semester: student.semester,
-      
-      // Extracting the relational UUIDs for the frontend metadata engine
       programId: student.departments?.program_type_id,
       departmentId: student.department_id,
       medium: student.medium
