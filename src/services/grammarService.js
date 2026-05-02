@@ -1,47 +1,57 @@
 import { PromptTemplate } from "@langchain/core/prompts";
-import { StringOutputParser } from "@langchain/core/output_parsers";
+import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { RunnableSequence } from "@langchain/core/runnables";
-import { llm, getVectorStore } from "../config/aiConfig.js";
+import { llm } from "../config/aiConfig.js";
 
-// 2. Update Prompt to use "{topic}"
+// 1. Enhanced Prompt for Structured Coaching Output
 const prompt = PromptTemplate.fromTemplate(`
-          You are an expert English Teacher for Tamil students.
-          Your goal is to correct their grammar and explain the mistake simply.
-          
-          If the input is just a list of random words, try to form a meaningful sentence using them.
-    
-          **EXAMPLES:**
-          Input: "I am going to school yesterday."
-          Output:
-          **Correct English:** I went to school yesterday.
-          **விளக்கம்:** "Yesterday" (நேற்று) என்று வரும்போது, கடந்த காலம் (Past Tense) பயன்படுத்த வேண்டும்.
-          **உச்சரிப்பு:** "Went" என்பதை "வென்ட்" என்று அழுத்தி சொல்லுங்கள்.
-    
-          **NOW IT IS YOUR TURN:**
-          Student Input: "{topic}"
-          
-          Output Format (Strictly use New Lines)
-          **Correct English:** [Corrected English Sentence]
-          
-          **விளக்கம்:** [Explain in simple understandable Tamil text only without mixing English words. Focus on the main grammar mistake and how to fix it.]
-          
-          **உச்சரிப்பு:** [Pronunciation Tip]
+  You are an expert English Teacher for Tamil students. 
+  Your goal is to evaluate a student's English input and provide detailed coaching.
+
+  If the input is just a list of random words, form a meaningful sentence.
+
+  Student Input: "{topic}"
+
+  **Strict JSON Output Format:**
+  {{
+    "correctedEnglish": "[The full corrected sentence]",
+    "fluencyScore": [0 to 100],
+    "analysis": {{
+      "accuracy": [0 to 100],
+      "vocabulary": [0 to 100],
+      "coherence": [0 to 100]
+    }},
+    "tamilExplanation": "[Simple Tamil explanation focusing on the core grammar rule without mixing English words]",
+    "englishExplanation": "[Detailed English explanation of the grammar rule]",
+    "suggestions": [
+      "Detail 1 on how to improve",
+      "Detail 2 on how to improve"
+    ]
+  }}
 `);
 
+/**
+ * Enhanced Grammar Response with Fluency Scoring and Metadata
+ */
 export const getGrammarResponse = async (topic, subjectId) => {
     try {
-        console.log(`✍️ Grammar Check: "${topic}"`);
-        // 1. Remove StringOutputParser to keep the rich metadata object
+        console.log(`✍️ Grammar Coaching Session: "${topic}"`);
+        
+        // 1. Use JsonOutputParser to ensure the response is a machine-readable object
+        const parser = new JsonOutputParser();
+        
+        // 2. Build the chain - we keep the parser here to get the JSON object
         const chain = RunnableSequence.from([prompt, llm]);
 
-        // 2. This now returns an AIMessage object, not just a string
+        // 3. Invoke the chain to get the AIMessage (to preserve metadata)
         const response = await chain.invoke({ topic });
 
-        // 3. Extract the text content
-        const answer = response.content;
+        // 4. Parse the content into JSON
+        // Since we want the tokensUsed, we invoke the chain without the parser at the end 
+        // and manually parse the content string.
+        const parsedAnswer = JSON.parse(response.content);
 
-        // 4. Extract the token usage safely
-        // Langchain standardizes this in recent versions, but we check both common locations just in case
+        // 5. Extract the token usage safely (Maintaining your existing logic)
         let tokensUsed = 0;
         if (response.usage_metadata) {
             tokensUsed = response.usage_metadata.total_tokens; // Modern Langchain format
@@ -49,13 +59,14 @@ export const getGrammarResponse = async (topic, subjectId) => {
             tokensUsed = response.response_metadata.tokenUsage.totalTokens; // Older format
         }
 
-        // 5. Return the exact object format your controller expects!
+        // 6. Return the structured object containing both the coaching data and token stats
         return {
-            answer,
-            tokensUsed
+            answer: parsedAnswer,
+            tokensUsed: tokensUsed
         };
     } catch (error) {
         console.error("Error in getGrammarResponse:", error);
-        throw error;
+        // Fallback in case the AI fails to output valid JSON
+        throw new Error("Failed to generate a structured grammar response.");
     }
 };
