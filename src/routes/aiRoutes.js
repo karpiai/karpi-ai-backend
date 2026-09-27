@@ -1,5 +1,5 @@
 import express from "express";
-import { handleAIRequest } from "../controllers/aiController.js";
+import { handleAIRequest, evaluateAIRequest, getLectureScript } from "../controllers/aiController.js";
 import { usageLogger } from "../middleware/usageLogger.js";
 import { tokenGuard } from "../middleware/tokenGuard.js"; // Import the guard
 
@@ -16,5 +16,7 @@ router.post("/learn", tokenGuard, handleAIRequest);
 router.post("/exam", tokenGuard, handleAIRequest);
 router.post("/activity", tokenGuard, handleAIRequest);
 router.post("/grammar", tokenGuard, handleAIRequest);
+router.post("/lecture-script", tokenGuard, getLectureScript); // Apply guard to lecture script route as well
+router.post("/evaluate-answer", tokenGuard, evaluateAIRequest); // Apply guard to evaluation route as well
 
 export default router;

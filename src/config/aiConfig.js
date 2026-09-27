@@ -3,6 +3,7 @@ import { ChatGroq } from "@langchain/groq";
 import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 /* import { OllamaEmbeddings } from "@langchain/ollama"; */
 import { VoyageEmbeddings } from "@langchain/community/embeddings/voyage";
+import Groq from "groq-sdk";
 
 // For now, keep Ollama for generating embeddings locally during migration
 // Once we are in the cloud, we will switch this to OpenAI or Voyage AI
@@ -22,6 +23,18 @@ export const llm = new ChatGroq({
     model: "openai/gpt-oss-120b", // <-- Back to the smart model!
     temperature: 0.1, 
 });
+
+let groqInstance = null;
+
+export const getGroqClient = () => {
+  if (!groqInstance) {
+    groqInstance = new Groq({
+      // This automatically looks for GROQ_API_KEY in your .env file
+      apiKey: process.env.GROQ_API_KEY, 
+    });
+  }
+  return groqInstance;
+};
 
 export const getVectorStore = (subjectId) => {
     return new SupabaseVectorStore(embeddings, {
